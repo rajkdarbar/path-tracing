@@ -1,13 +1,3 @@
-/*
-
-The results of ray tracing calculations (like color, intensity, etc.) are rendered to a render texture. 
-This texture acts as a canvas that captures the final image as computed by the ray tracing process. 
-Finally, the render texture is displayed on the screen or used for further processing.
-
-*/
-
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,72 +7,81 @@ public class PathTracingMaster : MonoBehaviour
     public Texture SkyboxTexture;
     public Light DirectionalLight;
 
+    public bool RegenerateScene = false;
+
     [Header("Spheres")]
-    public int SphereSeed;
     public Vector2 SphereRadius = new Vector2(3.0f, 8.0f);
     public uint SpheresMax = 100;
     public float SpherePlacementRadius = 100.0f;
 
-    private Camera _camera;
-    private float _lastFieldOfView;
+    private Camera mainCamera;
+    private float lastFieldOfView;
 
-    private RenderTexture _target;
-    private RenderTexture _converged;
+    private RenderTexture targetRT;
+    private RenderTexture convergedRT;
 
-    private uint _currentSample = 0;
-    private Material _addMaterial;
-    private ComputeBuffer _sphereBuffer;
-    private List<Transform> _transformsToWatch = new List<Transform>();
+    private uint currentSample = 0;
+    private Material addMaterial;
+    private ComputeBuffer sphereBuffer;
+    private List<Transform> trackedTransforms = new List<Transform>();
 
     struct Sphere
     {
-        public Vector3 position;
-        public float radius;
-        public Vector3 albedo;
-        public Vector3 specular;
-        public float smoothness;
-        public Vector3 emission;
+        public Vector3 position; // 12 bytes
+        public float radius; // 4 bytes
+        public Vector3 albedo; // 12 bytes
+        public Vector3 specular; // 12 bytes
+        public float smoothness; // 4 bytes
+        public Vector3 emission; // 12 bytes
     }
 
     private void Awake()
     {
-        _camera = GetComponent<Camera>();
-        _transformsToWatch.Add(transform);
-        _transformsToWatch.Add(DirectionalLight.transform);
+        mainCamera = GetComponent<Camera>();
+        trackedTransforms.Add(transform);
+        trackedTransforms.Add(DirectionalLight.transform);
     }
 
     private void OnEnable()
     {
-        _currentSample = 0;
+        currentSample = 0;
         SetUpScene();
     }
 
     private void OnDisable()
     {
-        if (_sphereBuffer != null)
-            _sphereBuffer.Release();
+        if (sphereBuffer != null)
+            sphereBuffer.Release();
     }
 
-    void Start()
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
-        //Debug.Log("screen height " + Screen.height + " screen width " + Screen.width);
+        SetShaderParameters();
+        Render(destination);
     }
 
     void Update()
     {
-        //VisualizeRays();
+        VisualizeRays();
 
-        if (_camera.fieldOfView != _lastFieldOfView)
+        if (RegenerateScene)
         {
-            _currentSample = 0;
-            _lastFieldOfView = _camera.fieldOfView;
+            RegenerateScene = false;
+            SetUpScene();
+            currentSample = 0;
         }
 
-        foreach (Transform t in _transformsToWatch)
+        if (mainCamera.fieldOfView != lastFieldOfView)
+        {
+            currentSample = 0;
+            lastFieldOfView = mainCamera.fieldOfView;
+        }
+
+        foreach (Transform t in trackedTransforms)
         {
             if (t.hasChanged)
             {
-                _currentSample = 0;
+                currentSample = 0;
                 t.hasChanged = false;
             }
         }
@@ -93,14 +92,12 @@ public class PathTracingMaster : MonoBehaviour
         int width = Screen.width;
         int height = Screen.height;
 
-        for (int x = 0; x < width; x += 100) // Increment by 10 for performance
+        for (int x = 0; x < width; x += 100)
         {
             for (int y = 0; y < height; y += 100)
             {
                 Vector2 uv = new Vector2((float)x / width, (float)y / height);
-                Ray ray = _camera.ViewportPointToRay(uv);
-
-                // Visualize the ray (set distance and color as needed)
+                Ray ray = mainCamera.ViewportPointToRay(uv);
                 Debug.DrawRay(ray.origin, ray.direction * 100, Color.red);
             }
         }
@@ -108,130 +105,161 @@ public class PathTracingMaster : MonoBehaviour
 
     private void SetUpScene()
     {
-        UnityEngine.Random.InitState(SphereSeed);
         List<Sphere> spheres = new List<Sphere>();
+        const int MAX_RETRIES = 10;
 
-        // Add a number of random spheres
         for (int i = 0; i < SpheresMax; i++)
         {
-            Sphere sphere = new Sphere();
+            int retries = 0;
+            Sphere sphere;
 
-            // Radius
-            sphere.radius = SphereRadius.x + UnityEngine.Random.value * (SphereRadius.y - SphereRadius.x);
-            Vector2 randomPos = UnityEngine.Random.insideUnitCircle * SpherePlacementRadius;
+        RetryPlacement:
+            sphere = new Sphere();
+            sphere.radius = SphereRadius.x + Random.value * (SphereRadius.y - SphereRadius.x);
+
+            Vector2 randomPos = Random.insideUnitCircle * SpherePlacementRadius;
             sphere.position = new Vector3(randomPos.x, sphere.radius, randomPos.y);
 
-            // Reject spheres that are intersecting others
+            // Check overlap
             foreach (Sphere other in spheres)
             {
                 float minDist = sphere.radius + other.radius;
                 if (Vector3.SqrMagnitude(sphere.position - other.position) < minDist * minDist)
-                    goto SkipSphere;
+                {
+                    if (retries++ < MAX_RETRIES)
+                        goto RetryPlacement; // try again
+                    else
+                        goto SkipSphere; // give up on this one
+                }
             }
 
-            // Albedo and specular color
+            float materialSelector = UnityEngine.Random.value;
             Color color = UnityEngine.Random.ColorHSV();
-            float chance = UnityEngine.Random.value;
-            if (chance < 0.8f)
+
+            if (materialSelector < 0.40f)
             {
-                bool metal = chance < 0.4f;
-                sphere.albedo = metal ? new Vector4(0.1f, 0.1f, 0.1f) : new Vector4(color.r, color.g, color.b);
-                sphere.specular = metal ? new Vector4(color.r, color.g, color.b) : new Vector4(0.1f, 0.1f, 0.1f);
-                sphere.smoothness = UnityEngine.Random.value; // Shininess property
+                // DIFFUSE (i.e. DIELECTRIC)   
+                sphere.albedo = new Vector3(color.r, color.g, color.b);
+                sphere.specular = new Vector3(0.04f, 0.04f, 0.04f);
+                sphere.smoothness = 0.0f;
+                sphere.emission = Vector3.zero;
             }
+
+            else if (materialSelector >= 0.4f && materialSelector < 0.6f)
+            {
+                // GLOSSY DIELECTRIC
+                sphere.albedo = new Vector3(color.r, color.g, color.b);
+                sphere.specular = new Vector3(1f, 1f, 1f); // white highlights
+                sphere.smoothness = UnityEngine.Random.value;
+                sphere.emission = Vector3.zero;
+            }
+
+            else if (materialSelector >= 0.6f && materialSelector < 0.9f)
+            {
+                // METAL
+                sphere.albedo = Vector3.zero;
+                sphere.specular = new Vector3(color.r, color.g, color.b);
+                sphere.smoothness = UnityEngine.Random.Range(0.5f, 1.0f); // generally shiny
+                sphere.emission = Vector3.zero;
+            }
+
             else
             {
-                Color emission = UnityEngine.Random.ColorHSV(0, 1, 0, 1, 3.0f, 8.0f);
-                sphere.emission = new Vector3(emission.r, emission.g, emission.b); // Glowing property
+                // EMISSIVE (LIGHT)
+                Color emissionColor = UnityEngine.Random.ColorHSV(0f, 1f, 0f, 1f, 1f, 3.5f);
+
+                sphere.albedo = Vector3.zero;
+                sphere.specular = Vector3.zero;
+                sphere.smoothness = 0f;
+                sphere.emission = new Vector3(emissionColor.r, emissionColor.g, emissionColor.b);
             }
 
             // Add the sphere to the list
             spheres.Add(sphere);
+            continue;
 
         SkipSphere:
             continue;
         }
 
         // Assign to compute buffer
-        if (_sphereBuffer != null)
-            _sphereBuffer.Release();
+        if (sphereBuffer != null)
+            sphereBuffer.Release();
+
         if (spheres.Count > 0)
         {
-            _sphereBuffer = new ComputeBuffer(spheres.Count, 56);
-            _sphereBuffer.SetData(spheres);
+            const int SphereStride = sizeof(float) * (3 + 1 + 3 + 3 + 1 + 3); // 56 bytes
+            sphereBuffer = new ComputeBuffer(spheres.Count, SphereStride);
+            sphereBuffer.SetData(spheres);
         }
     }
 
     private void SetShaderParameters()
     {
-        PathTracingShader.SetFloat("_Seed", UnityEngine.Random.value);
-        PathTracingShader.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
-
-        PathTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
-        PathTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse); // 2D->3D        
-        PathTracingShader.SetVector("_PixelOffset", new Vector2(UnityEngine.Random.value, UnityEngine.Random.value));
+        PathTracingShader.SetFloat("seed", Random.value);
+        PathTracingShader.SetTexture(0, "SkyboxTexture", SkyboxTexture);
+        PathTracingShader.SetMatrix("CameraToWorld", mainCamera.cameraToWorldMatrix);
+        PathTracingShader.SetMatrix("CameraInverseProjection", mainCamera.projectionMatrix.inverse);
+        PathTracingShader.SetVector("PixelOffset", new Vector2(Random.value, Random.value));
 
         Vector3 light = DirectionalLight.transform.forward;
-        PathTracingShader.SetVector("_DirectionalLight", new Vector4(light.x, light.y, light.z, DirectionalLight.intensity));
+        PathTracingShader.SetVector("DirectionalLight", new Vector4(light.x, light.y, light.z, DirectionalLight.intensity));
 
-        if (_sphereBuffer != null)
-            PathTracingShader.SetBuffer(0, "_Spheres", _sphereBuffer);
+        if (sphereBuffer != null)
+            PathTracingShader.SetBuffer(0, "SpheresBuffer", sphereBuffer);
     }
 
-
-    // When the screen size changes (like resizing the game window), 
-    // InitRenderTexture() ensures that the textures used for rendering the scene are updated to match the new size.    
-    private void InitRenderTexture()
-    {
-        if (_target == null || _target.width != Screen.width || _target.height != Screen.height)
-        {
-            // Release render texture if we already have one
-            if (_target != null)
-            {
-                _target.Release();
-                _converged.Release();
-            }
-
-            // Get a render target for Ray Tracing
-            _target = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            _target.enableRandomWrite = true;
-            _target.Create();
-
-            _converged = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            _converged.enableRandomWrite = true;
-            _converged.Create();
-
-            // Reset sampling
-            _currentSample = 0;
-        }
-    }
-
-    //This process progressively renders the scene using path tracing, 
-    //refining the result with each frame by accumulating the results, which reduces noise and improves image quality.
     private void Render(RenderTexture destination)
     {
-        // Make sure we have a current render target
         InitRenderTexture();
 
-        // Set the target and dispatch the compute shader
-        PathTracingShader.SetTexture(0, "Result", _target);
+        PathTracingShader.SetTexture(0, "Result", targetRT);
+
         int threadGroupsX = Mathf.CeilToInt(Screen.width / 8.0f);
         int threadGroupsY = Mathf.CeilToInt(Screen.height / 8.0f);
         PathTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
-        if (_addMaterial == null)
-            _addMaterial = new Material(Shader.Find("Hidden/AddShader"));
-        _addMaterial.SetFloat("_Sample", _currentSample);
+        if (addMaterial == null)
+            addMaterial = new Material(Shader.Find("Hidden/AddShader"));
 
-        Graphics.Blit(_target, _converged, _addMaterial); // The shader accumulates the rendering result from _target into _converged, smoothing out noise over multiple samples.
-        Graphics.Blit(_converged, destination); // The accumulated result in _converged is then drawn to the destination render texture, typically the screen.    
+        RenderTexture tempRT = RenderTexture.GetTemporary(convergedRT.width, convergedRT.height, 0, RenderTextureFormat.ARGBFloat);
 
-        _currentSample++;
+        addMaterial.SetTexture("_MainTex", targetRT); // new sample
+        addMaterial.SetTexture("_History", convergedRT); // previous frame
+        addMaterial.SetFloat("_Sample", currentSample);
+
+        Graphics.Blit(null, tempRT, addMaterial); // shader output gets stored in tempRT        
+        Graphics.Blit(tempRT, convergedRT); // copy back from tempRT to convergedRT
+        Graphics.Blit(convergedRT, destination);
+        RenderTexture.ReleaseTemporary(tempRT);
+
+        currentSample++;
     }
 
-    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+
+    private void InitRenderTexture()
     {
-        SetShaderParameters();
-        Render(destination);
+        if (targetRT == null || targetRT.width != Screen.width || targetRT.height != Screen.height)
+        {
+            if (targetRT != null)
+            {
+                targetRT.Release();
+            }
+
+            if (convergedRT != null)
+            {
+                convergedRT.Release();
+            }
+
+            targetRT = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            targetRT.enableRandomWrite = true;
+            targetRT.Create();
+
+            convergedRT = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            convergedRT.enableRandomWrite = true;
+            convergedRT.Create();
+
+            currentSample = 0;
+        }
     }
 }

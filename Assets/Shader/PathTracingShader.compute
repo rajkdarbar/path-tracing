@@ -1,58 +1,49 @@
-// Each #kernel tells which function to compile; We can have many kernels.
-
 #pragma kernel CSMain
 
-RWTexture2D<float4> Result; // This is a writable texture to store the final rendered image.
+RWTexture2D<float4> Result; // writable texture to store the final rendered image.
 
-float4x4 _CameraToWorld;
-float4x4 _CameraInverseProjection;
+float4x4 CameraToWorld;
+float4x4 CameraInverseProjection;
 
-float4 _DirectionalLight;
+float4 DirectionalLight;
+float2 PixelOffset;
 
-float2 _PixelOffset;
-
-Texture2D<float4> _SkyboxTexture;
+Texture2D<float4> SkyboxTexture;
 SamplerState sampler_SkyboxTexture;
 static const float PI = 3.14159265f;
 
+float2 _Pixel;
+float seed;
 
-float sdot(float3 x, float3 y, float f = 1.0f)
+float rand()
 {
-    return saturate(dot(x, y) * f);
+    float result = frac(sin(seed / 100.0f * dot(_Pixel, float2(12.9898f, 78.233f))) * 43758.5453f); // take fraction part
+    seed += 1.0f;
+    return result;
 }
 
 float energy(float3 color)
 {
-    return dot(color, 1.0f / 3.0f);
-}
-
-float2 _Pixel;
-float _Seed;
-
-float rand()
-{
-    float result = frac(sin(_Seed / 100.0f * dot(_Pixel, float2(12.9898f, 78.233f))) * 43758.5453f); // Fraction part
-    _Seed += 1.0f;
-    return result;
+    return (color.r + color.g + color.b) / 3.0f;
 }
 
 struct Sphere
 {
     float3 position;
     float radius;
-    float3 albedo; // Diffuse property
-    float3 specular; // Reflective property
-    float smoothness; // Shininess property
-    float3 emission; // Glowing property
+    float3 albedo;
+    float3 specular;
+    float smoothness;
+    float3 emission;
 };
 
-StructuredBuffer<Sphere> _Spheres;
+StructuredBuffer<Sphere> SpheresBuffer;
 
 struct Ray
 {
     float3 origin;
-    float3 direction;  
-    float3 energy;  
+    float3 direction;
+    float3 energy;
 };
 
 Ray CreateRay(float3 origin, float3 direction)
@@ -64,15 +55,19 @@ Ray CreateRay(float3 origin, float3 direction)
     return ray;
 }
 
+
 Ray CreateCameraRay(float2 uv)
 {
-    // Transform the camera origin to world space
-    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz; // w = 1 for position
+    // Camera origin in world space
+    float3 origin = mul(CameraToWorld, float4(0, 0, 0, 1)).xyz;
 
-    // Invert the perspective projection of the view-space position
-    float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;    
-    // Transform the direction from camera to world space and normalize
-    direction = mul(_CameraToWorld, float4(direction, 0.0f)).xyz; // w = 0 for direction
+    // Unproject from NDC → view space
+    float4 pos = mul(CameraInverseProjection, float4(uv, 1.0f, 1.0f));
+    pos /= pos.w; // perspective divide
+    float3 viewDir = normalize(pos.xyz); // direction in view space
+
+    // Convert to world space
+    float3 direction = mul(CameraToWorld, float4(viewDir, 0)).xyz;
     direction = normalize(direction);
 
     return CreateRay(origin, direction);
@@ -104,42 +99,68 @@ RayHit CreateRayHit()
 
 void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
 {
-    // Calculate distance along the ray where the ground plane is intersected
-    float t = -ray.origin.y / ray.direction.y; // This ground plane is aligned with XZ plane
+    float denom = ray.direction.y;
+
+    // 1. Only intersect if ray is pointing downward
+    // 2. Avoid division by zero and near-zero
+
+    if (denom >= - 0.0001) // if ray is not pointing down enough
+    return;
+
+    float t = - ray.origin.y / denom; // ground plane is aligned with XZ plane passing through the origin
+
     if (t > 0 && t < bestHit.distance)
     {
         bestHit.distance = t;
         bestHit.position = ray.origin + t * ray.direction;
-        bestHit.normal = float3(0.0f, 1.0f, 0.0f);
-        bestHit.albedo = float3(0.8f, 0.8f, 0.8f);
-        bestHit.specular = float3(0.2f, 0.2f, 0.2f);
-        bestHit.smoothness = 0.2f;
-        bestHit.emission = float3(0.0f, 0.0f, 0.0f);        
+        bestHit.normal = float3(0.0f, 1.0f, 0.0f); // plane normal is along the Y direction
+
+        // The ground plane is a diffuse surface
+        bestHit.albedo = float3(0.82, 0.78, 0.72);
+        bestHit.specular = float3(0.04f, 0.04f, 0.04f);
+        bestHit.smoothness = 0.0f;
+        bestHit.emission = float3(0.0f, 0.0f, 0.0f);
     }
 }
 
+
 void IntersectSphere(Ray ray, inout RayHit bestHit, uint sphereIndex)
 {
-    // Calculate distance along the ray where the sphere is intersected
-    Sphere sphere = _Spheres[sphereIndex];
-    float3 d = ray.origin - sphere.position;
-    float p1 = -dot(ray.direction, d);
-    float p2sqr = p1 * p1 - dot(d, d) + sphere.radius * sphere.radius;
-    if (p2sqr < 0)
-        return;
-    float p2 = sqrt(p2sqr);
-    float t = p1 - p2 > 0 ? p1 - p2 : p1 + p2;
-    if (t > 0 && t < bestHit.distance)
-    {
-        bestHit.distance = t;
-        bestHit.position = ray.origin + t * ray.direction;
-        bestHit.normal = normalize(bestHit.position - sphere.position);
-        bestHit.albedo = sphere.albedo;
-        bestHit.specular = sphere.specular;
-        bestHit.smoothness = sphere.smoothness;
-        bestHit.emission = sphere.emission;
-    }
+    Sphere sphere = SpheresBuffer[sphereIndex];
+
+    float3 d = ray.origin - sphere.position; // vector from sphere center to ray origin
+
+    // Quadratic coefficients for: t² + bt + c = 0
+    float a = 1.0f;
+    float b = 2.0f * dot(ray.direction, d);
+    float c = dot(d, d) - sphere.radius * sphere.radius;
+
+    float discriminant = b * b - 4.0f * a * c;
+    if (discriminant < 0.0f)
+    return; // no intersection
+
+    float sqrtDisc = sqrt(discriminant);
+
+    // Find two roots
+    float t1 = (- b - sqrtDisc) * 0.5f; // divided by 2a = 2
+    float t2 = (- b + sqrtDisc) * 0.5f;
+
+    // Pick nearest positive root
+    float t = (t1 > 0.0f) ? t1 : t2;
+    if (t <= 0.0f || t >= bestHit.distance)
+    return;
+
+    // Update closest hit
+    bestHit.distance = t;
+    bestHit.position = ray.origin + t * ray.direction;
+    bestHit.normal = normalize(bestHit.position - sphere.position);
+
+    bestHit.albedo = sphere.albedo;
+    bestHit.specular = sphere.specular;
+    bestHit.smoothness = sphere.smoothness;
+    bestHit.emission = sphere.emission;
 }
+
 
 RayHit Trace(Ray ray)
 {
@@ -150,94 +171,196 @@ RayHit Trace(Ray ray)
 
     // Trace spheres
     uint numSpheres, stride;
-    _Spheres.GetDimensions(numSpheres, stride);
+    SpheresBuffer.GetDimensions(numSpheres, stride);
 
-    for (uint i = 0; i < numSpheres; i++)
-        IntersectSphere(ray, bestHit, i);
+    for (uint i = 0; i < numSpheres; i ++)
+    IntersectSphere(ray, bestHit, i);
 
     return bestHit;
 }
 
-float3x3 GetTangentSpace(float3 normal)
-{
-    // Choose a helper vector for the cross product
-    float3 helper = float3(1, 0, 0);
-    if (abs(normal.x) > 0.99f)
-        helper = float3(0, 0, 1);
-
-    // Generate vectors
-    float3 tangent = normalize(cross(normal, helper));
-    float3 binormal = normalize(cross(normal, tangent));
-    return float3x3(tangent, binormal, normal);
-}
-
-float3 SampleHemisphere(float3 normal, float alpha)
-{
-    // Spherical coordinate to cartesian
-    float cosTheta = pow(rand(), 1.0f / (alpha + 1.0f));
-    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
-    float phi = 2 * PI * rand();
-    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-
-    // Transform direction to world space
-    return mul(tangentSpaceDir, GetTangentSpace(normal));
-}
 
 float SmoothnessToPhongAlpha(float s)
 {
     return pow(1000.0f, s * s);
 }
 
+float3 SampleHemispherePhong(float3 R, float alpha)
+{
+    float r1 = rand();
+    float r2 = rand();
+
+    float phi = 2.0f * PI * r1;
+    float cosTheta = pow(r2, 1.0f / (alpha + 1.0f));
+    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+
+    float3 localDir = float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
+
+    // Build orthonormal basis directions around the reflection vector
+    float3 helper = abs(R.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
+    float3 tangent = normalize(cross(helper, R));
+    float3 bitangent = cross(R, tangent);
+    float3x3 basis = float3x3(tangent, R, bitangent);
+
+    return normalize(mul(localDir, basis));
+}
+
+
+float3 SampleHemisphereCosine(float3 normal)
+{
+    // Random numbers in [0,1)
+    float r1 = rand();
+    float r2 = rand();
+
+    // Convert (r1, r2) to spherical cosine-weighted distribution
+    float phi = 2.0f * PI * r1;
+    float r = sqrt(r2);
+    float x = r * cos(phi);
+    float z = r * sin(phi);
+    float y = sqrt(max(0.0f, 1.0f - r2)); // cos(theta)
+
+    float3 localDir = float3(x, y, z); // sampled direction
+
+    // Build orthonormal basis directions around the normal vector
+    float3 helper = abs(normal.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
+    float3 tangent = normalize(cross(helper, normal));
+    float3 bitangent = cross(normal, tangent);
+    float3x3 basis = float3x3(tangent, normal, bitangent);
+
+    // Transform sampled direction from tangent space to world space
+    float3 worldDir = mul(localDir, basis);
+    worldDir = normalize(worldDir);
+    return worldDir;
+}
+
+
+float approx(float a, float b, float eps = 0.001f)
+{
+    return abs(a - b) < eps;
+}
+
+bool approx3(float3 a, float3 b, float eps = 0.001f)
+{
+    return approx(a.x, b.x, eps) && approx(a.y, b.y, eps) && approx(a.z, b.z, eps);
+}
+
 float3 Shade(inout Ray ray, RayHit hit)
 {
-    if (hit.distance < 1.#INF)
-    {        
-        // Calculate chances of diffuse and specular reflection
-        hit.albedo = min(1.0f - hit.specular, hit.albedo);
-        float specChance = energy(hit.specular);
-        float diffChance = energy(hit.albedo);
-
-        // Roulette-select the ray's path
-        float roulette = rand();
-        if (roulette < specChance)
-        {
-            // Specular reflection            
-            ray.origin = hit.position + hit.normal * 0.001f;
-            float alpha = SmoothnessToPhongAlpha(hit.smoothness);
-            float3 reflected = reflect(ray.direction, hit.normal);
-            ray.direction = SampleHemisphere(reflected, alpha);
-            float f = (alpha + 2) / (alpha + 1);
-            ray.energy *= (1.0f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);
-        }
-
-        else if (diffChance > 0 && roulette < specChance + diffChance)
-        {
-            // Diffuse reflection
-            ray.origin = hit.position + hit.normal * 0.001f;
-            ray.direction = SampleHemisphere(hit.normal, 1.0f);
-            ray.energy *= (1.0f / diffChance) * hit.albedo;
-        }
-
-        else
-        {
-            // Terminate ray
-            ray.energy = 0.0f;
-        }
-
-        return hit.emission;        
-    }
-
-    else
+    // Case I: SKY (miss case)
+    if (hit.distance == 1.#INF)
     {
-        // Erase the ray's energy - the sky doesn't reflect anything
         ray.energy = 0.0f;
-
-        // Sample the skybox and write it
-        float theta = acos(ray.direction.y) / -PI;
-        float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
-        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
+        float theta = acos(ray.direction.y) / - PI;
+        float phi = atan2(ray.direction.x, - ray.direction.z) / - PI * 0.5f;
+        float3 sky = SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
+        return sky * 1.5f;
     }
+
+    float3 emission = hit.emission;
+
+    // Case II: EMISSIVE Sphere acts as a light source
+    bool isEmissive = any(hit.emission > 0.0f);
+    if (isEmissive)
+    {
+        ray.energy = 0.0f;
+        return emission;
+    }
+
+    // Material Classification: DIFFUSE
+    bool isDiffuse =
+    any(hit.albedo > 0) &&
+    approx3(hit.specular, float3(0.04, 0.04, 0.04)) &&
+    approx(hit.smoothness, 0.0f);
+
+    // Material Classification: METAL
+    bool isMetal =
+    length(hit.albedo) < 0.001 &&
+    any(hit.specular > 0) &&
+    hit.smoothness >= 0.5f;
+
+    // Material Classification: GLOSSY
+    bool isGlossy =
+    any(hit.albedo > 0) &&
+    approx3(hit.specular, float3(1, 1, 1)) &&
+    hit.smoothness > 0.0f;
+
+    // Case III: DIFFUSE SHADE
+    if (isDiffuse)
+    {
+        // Sampling outgoing ray along the surfce normal direction
+        ray.direction = SampleHemisphereCosine(hit.normal);
+        ray.origin = hit.position + ray.direction * 0.005f;
+        ray.energy *= hit.albedo;
+        return 0;
+    }
+
+    // Case IV: METAL SHADE
+    if (isMetal)
+    {
+        // 1. Incoming angle
+        float cosTheta_i = saturate(dot(hit.normal, - ray.direction));
+
+        // 2. Sample outgoing ray direction from Phong lobe; NOT Blinn-Phong lobe
+        float3 R = reflect(ray.direction, hit.normal);
+        float alpha = SmoothnessToPhongAlpha(hit.smoothness);
+        float3 wo = SampleHemispherePhong(R, alpha);
+
+        // 3. Monte-Carlo weight
+        float weight = ((alpha + 2.0f) / (alpha + 1.0f)) * cosTheta_i;
+
+        // 4. Update the outgoing ray
+        ray.direction = wo;
+        ray.origin = hit.position + wo * 0.005f;
+        ray.energy *= hit.specular * weight;
+        return 0;
+    }
+
+    //Case V: GLOSSY SHADE (mixed diffuse + specular)
+    if (isGlossy)
+    {
+        // Russian Roulette based selection
+        float diffChance = energy(hit.albedo);
+        float specChance = energy(hit.specular);
+        float sum = diffChance + specChance;
+
+        diffChance /= sum;
+        specChance /= sum;
+
+        float r = rand();
+
+        if (r < specChance)
+        {
+            // SPECULAR branch
+            float3 R = reflect(ray.direction, hit.normal);
+            float alpha = SmoothnessToPhongAlpha(hit.smoothness);
+
+            float3 wo = SampleHemispherePhong(R, alpha);
+
+            // cos(theta_i) = incoming angle
+            float cosTheta_i = saturate(dot(hit.normal, - ray.direction));
+
+            // Monte-Carlo weight for Phong lobe
+            float weight = ((alpha + 2.0f) / (alpha + 1.0f)) * cosTheta_i;
+
+            // Update the outgoing ray
+            ray.direction = wo;
+            ray.origin = hit.position + wo * 0.005f;
+            ray.energy *= (hit.specular * (weight / specChance)); // division by 'specChance' makes Russian Roulette based selection unbaised
+            return 0;
+        }
+
+        // DIFFUSE branch
+        float3 wo = SampleHemisphereCosine(hit.normal);
+
+        ray.direction = wo;
+        ray.origin = hit.position + wo * 0.005f;
+        ray.energy *= (hit.albedo / diffChance); // division by 'diffChance' makes Russian Roulette based selection unbaised
+        return 0;
+    }
+
+    return float3(0, 0, 0); // fallback
 }
+
 
 
 [numthreads(8,8,1)]
@@ -249,22 +372,28 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     uint width, height;
     Result.GetDimensions(width, height);
 
-    // Transform pixel to [-1,1] range for DirectX used by Unity
-    float2 uv = float2((id.xy + _PixelOffset) / float2(width, height) * 2.0f - 1.0f);
+    // Convert pixel coordinates to normalized device coordinates [-1, 1]
+    float2 uv = float2((id.xy + PixelOffset) / float2(width, height) * 2.0f - 1.0f);
 
-    // Get a ray for the UVs
-    Ray ray = CreateCameraRay(uv); 
+    // Generate a primary ray from the camera through this pixel
+    Ray ray = CreateCameraRay(uv);
+
+    float3 shadedColor = float3(0, 0, 0);
 
     // Trace and shade the ray
-    float3 result = float3(0, 0, 0);
-    for (int i = 0; i < 8; i++)
+    for (int bounce = 0; bounce < 10; bounce ++)
     {
-        RayHit hit = Trace(ray);
-        result += ray.energy * Shade(ray, hit); // Here, we are considering energy of the incident ray, not the outgoing ray
+        float3 incidentRayEnergy = ray.energy; // current light intensity carried by the ray
 
-        if (!any(ray.energy))
-            break;
+        RayHit hit = Trace(ray); // find intersection with the scene
+
+        float3 reflectedRadiance = Shade(ray, hit); // light reflected / emitted from the surface toward the camera
+        shadedColor += incidentRayEnergy * reflectedRadiance; // accumulate final pixel color
+
+        if (! any(ray.energy)) // stop when the ray no longer carries light
+        break;
     }
 
-    Result[id.xy] = float4(result, 1); 
+    // Store final pixel color
+    Result[id.xy] = float4(shadedColor, 1);
 }
