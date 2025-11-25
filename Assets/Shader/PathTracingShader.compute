@@ -10,7 +10,9 @@ float2 PixelOffset;
 
 Texture2D<float4> SkyboxTexture;
 SamplerState sampler_SkyboxTexture;
+
 static const float PI = 3.14159265f;
+static const float EPSILON = 0.00000001f; // same as 1e-8
 
 float2 _Pixel;
 float seed;
@@ -38,6 +40,19 @@ struct Sphere
 };
 
 StructuredBuffer<Sphere> SpheresBuffer;
+
+struct Triangle
+{
+    float3 v0, v1, v2;
+    float3 normal;
+    float3 albedo;
+    float3 specular;
+    float smoothness;
+    float3 emission;
+};
+
+StructuredBuffer<Triangle> TrianglesBuffer;
+
 
 struct Ray
 {
@@ -162,6 +177,51 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, uint sphereIndex)
 }
 
 
+void IntersectTriangle(Ray ray, inout RayHit bestHit, uint triIndex)
+{
+    Triangle tri = TrianglesBuffer[triIndex];
+
+    float3 edge1 = tri.v1 - tri.v0;
+    float3 edge2 = tri.v2 - tri.v0;
+
+    float3 pvec = cross(ray.direction, edge2);
+    float det = dot(edge1, pvec);
+
+    // Reject near-zero determinant
+    if (abs(det) < EPSILON) return;
+
+    float invDet = 1.0f / det;
+    float3 tvec = ray.origin - tri.v0;
+
+    float u = dot(tvec, pvec) * invDet;
+    if (u < 0.0f || u > 1.0f) return;
+
+    float3 qvec = cross(tvec, edge1);
+    float v = dot(ray.direction, qvec) * invDet;
+    if (v < 0.0f || u + v > 1.0f) return;
+
+    float t = dot(edge2, qvec) * invDet;
+
+    // Ensure the hit is in front of the ray
+    if (t <= EPSILON || t >= bestHit.distance)
+    return;
+
+    // Optionally flip normal if backface hit (depends on convention)
+    float3 normal = normalize(tri.normal);
+    if (dot(ray.direction, normal) > 0.0f)
+    normal = - normal;
+
+    // Update hit
+    bestHit.distance = t;
+    bestHit.position = ray.origin + t * ray.direction;
+    bestHit.normal = normal;
+    bestHit.albedo = tri.albedo;
+    bestHit.specular = tri.specular;
+    bestHit.smoothness = tri.smoothness;
+    bestHit.emission = tri.emission;
+}
+
+
 RayHit Trace(Ray ray)
 {
     RayHit bestHit = CreateRayHit();
@@ -170,11 +230,17 @@ RayHit Trace(Ray ray)
     IntersectGroundPlane(ray, bestHit);
 
     // Trace spheres
-    uint numSpheres, stride;
-    SpheresBuffer.GetDimensions(numSpheres, stride);
+    uint numSpheres, strideSphere;
+    SpheresBuffer.GetDimensions(numSpheres, strideSphere);
 
     for (uint i = 0; i < numSpheres; i ++)
     IntersectSphere(ray, bestHit, i);
+
+    // Trace triangles
+    uint numTris, strideTriangle;
+    TrianglesBuffer.GetDimensions(numTris, strideTriangle);
+    for (uint i = 0; i < numTris; i ++)
+    IntersectTriangle(ray, bestHit, i);
 
     return bestHit;
 }
@@ -196,13 +262,16 @@ float3 SampleHemispherePhong(float3 R, float alpha)
 
     float3 localDir = float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
 
-    // Build orthonormal basis directions around the reflection vector
+    // Build orthonormal basis directions around the reflection vector (i.e. building tangent space)
     float3 helper = abs(R.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
     float3 tangent = normalize(cross(helper, R));
     float3 bitangent = cross(R, tangent);
     float3x3 basis = float3x3(tangent, R, bitangent);
 
-    return normalize(mul(localDir, basis));
+    // Transform sampled direction from tangent space to world space
+    float3 worldDir = mul(localDir, basis);
+    worldDir = normalize(worldDir);
+    return worldDir;
 }
 
 
@@ -221,7 +290,7 @@ float3 SampleHemisphereCosine(float3 normal)
 
     float3 localDir = float3(x, y, z); // sampled direction
 
-    // Build orthonormal basis directions around the normal vector
+    // Build orthonormal basis directions around the normal vector (i.e. building tangent space)
     float3 helper = abs(normal.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
     float3 tangent = normalize(cross(helper, normal));
     float3 bitangent = cross(normal, tangent);
@@ -272,17 +341,18 @@ float3 Shade(inout Ray ray, RayHit hit)
     approx3(hit.specular, float3(0.04, 0.04, 0.04)) &&
     approx(hit.smoothness, 0.0f);
 
-    // Material Classification: METAL
-    bool isMetal =
+    // Material Classification: GLOSSY METALLIC
+    bool isGlossyMetal =
     length(hit.albedo) < 0.001 &&
     any(hit.specular > 0) &&
-    hit.smoothness >= 0.5f;
+    hit.smoothness >= 0.6f;
 
-    // Material Classification: GLOSSY
-    bool isGlossy =
+    // Material Classification: GLOSSY DIELECTRIC
+    bool isGlossyDielectric =
     any(hit.albedo > 0) &&
     approx3(hit.specular, float3(1, 1, 1)) &&
-    hit.smoothness > 0.0f;
+    hit.smoothness > 0.0f && hit.smoothness < 0.6f;
+
 
     // Case III: DIFFUSE SHADE
     if (isDiffuse)
@@ -294,8 +364,8 @@ float3 Shade(inout Ray ray, RayHit hit)
         return 0;
     }
 
-    // Case IV: METAL SHADE
-    if (isMetal)
+    // Case IV: GLOSSY METALLIC SHADE
+    if (isGlossyMetal)
     {
         // 1. Incoming angle
         float cosTheta_i = saturate(dot(hit.normal, - ray.direction));
@@ -315,8 +385,8 @@ float3 Shade(inout Ray ray, RayHit hit)
         return 0;
     }
 
-    //Case V: GLOSSY SHADE (mixed diffuse + specular)
-    if (isGlossy)
+    //Case V: GLOSSY DIELECTRIC SHADE (mixed of diffuse + specular)
+    if (isGlossyDielectric)
     {
         // Russian Roulette based selection
         float diffChance = energy(hit.albedo);

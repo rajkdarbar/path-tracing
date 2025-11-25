@@ -14,6 +14,9 @@ public class PathTracingMaster : MonoBehaviour
     public uint SpheresMax = 100;
     public float SpherePlacementRadius = 100.0f;
 
+    [Header("3D Meshes")]
+    public GameObject[] MeshObjects;
+
     private Camera mainCamera;
     private float lastFieldOfView;
 
@@ -22,7 +25,10 @@ public class PathTracingMaster : MonoBehaviour
 
     private uint currentSample = 0;
     private Material addMaterial;
+
     private ComputeBuffer sphereBuffer;
+    private ComputeBuffer triangleBuffer;
+
     private List<Transform> trackedTransforms = new List<Transform>();
 
     struct Sphere
@@ -35,11 +41,22 @@ public class PathTracingMaster : MonoBehaviour
         public Vector3 emission; // 12 bytes
     }
 
+    struct Triangle
+    {
+        public Vector3 v0; // 12 bytes
+        public Vector3 v1; // 12 bytes
+        public Vector3 v2; // 12 bytes
+        public Vector3 normal; // 12 bytes
+        public Vector3 albedo; // 12 bytes
+        public Vector3 specular; // 12 bytes
+        public float smoothness; // 4 bytes
+        public Vector3 emission; // 12 bytes
+    }
+
+
     private void Awake()
     {
         mainCamera = GetComponent<Camera>();
-        trackedTransforms.Add(transform);
-        trackedTransforms.Add(DirectionalLight.transform);
     }
 
     private void OnEnable()
@@ -52,6 +69,10 @@ public class PathTracingMaster : MonoBehaviour
     {
         if (sphereBuffer != null)
             sphereBuffer.Release();
+
+        if (triangleBuffer != null)
+            triangleBuffer.Release();
+
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
@@ -62,7 +83,7 @@ public class PathTracingMaster : MonoBehaviour
 
     void Update()
     {
-        VisualizeRays();
+        //VisualizeRays();
 
         if (RegenerateScene)
         {
@@ -77,13 +98,21 @@ public class PathTracingMaster : MonoBehaviour
             lastFieldOfView = mainCamera.fieldOfView;
         }
 
+        bool needsRebuild = false;
+
         foreach (Transform t in trackedTransforms)
         {
             if (t.hasChanged)
             {
-                currentSample = 0;
+                needsRebuild = true;
                 t.hasChanged = false;
             }
+        }
+
+        if (needsRebuild)
+        {
+            SetUpScene();
+            currentSample = 0;
         }
     }
 
@@ -105,6 +134,13 @@ public class PathTracingMaster : MonoBehaviour
 
     private void SetUpScene()
     {
+        trackedTransforms.Clear();
+
+        // Always track camera + light
+        trackedTransforms.Add(transform);
+        trackedTransforms.Add(DirectionalLight.transform);
+
+        // Part - I: Setup Spheres
         List<Sphere> spheres = new List<Sphere>();
         const int MAX_RETRIES = 10;
 
@@ -133,12 +169,12 @@ public class PathTracingMaster : MonoBehaviour
                 }
             }
 
-            float materialSelector = UnityEngine.Random.value;
-            Color color = UnityEngine.Random.ColorHSV();
+            Color color = Random.ColorHSV();
 
+            float materialSelector = Random.value;
             if (materialSelector < 0.40f)
             {
-                // DIFFUSE (i.e. DIELECTRIC)   
+                // DIFFUSE (Lambertian) — rough, matte. 
                 sphere.albedo = new Vector3(color.r, color.g, color.b);
                 sphere.specular = new Vector3(0.04f, 0.04f, 0.04f);
                 sphere.smoothness = 0.0f;
@@ -147,25 +183,25 @@ public class PathTracingMaster : MonoBehaviour
 
             else if (materialSelector >= 0.4f && materialSelector < 0.6f)
             {
-                // GLOSSY DIELECTRIC
+                // GLOSSY DIELECTRIC — plastic, ceramic, smooth surface.
                 sphere.albedo = new Vector3(color.r, color.g, color.b);
                 sphere.specular = new Vector3(1f, 1f, 1f); // white highlights
-                sphere.smoothness = UnityEngine.Random.value;
+                sphere.smoothness = Random.Range(0.2f, 0.6f);
                 sphere.emission = Vector3.zero;
             }
 
             else if (materialSelector >= 0.6f && materialSelector < 0.9f)
             {
-                // METAL
+                // GLOSSY METALLIC — shiny metal, color-tinted reflections.
                 sphere.albedo = Vector3.zero;
                 sphere.specular = new Vector3(color.r, color.g, color.b);
-                sphere.smoothness = UnityEngine.Random.Range(0.5f, 1.0f); // generally shiny
+                sphere.smoothness = Random.Range(0.6f, 1.0f);
                 sphere.emission = Vector3.zero;
             }
 
             else
             {
-                // EMISSIVE (LIGHT)
+                // EMISSIVE — light source.
                 Color emissionColor = UnityEngine.Random.ColorHSV(0f, 1f, 0f, 1f, 1f, 3.5f);
 
                 sphere.albedo = Vector3.zero;
@@ -182,7 +218,7 @@ public class PathTracingMaster : MonoBehaviour
             continue;
         }
 
-        // Assign to compute buffer
+        // Assign spheres to compute buffer
         if (sphereBuffer != null)
             sphereBuffer.Release();
 
@@ -191,6 +227,78 @@ public class PathTracingMaster : MonoBehaviour
             const int SphereStride = sizeof(float) * (3 + 1 + 3 + 3 + 1 + 3); // 56 bytes
             sphereBuffer = new ComputeBuffer(spheres.Count, SphereStride);
             sphereBuffer.SetData(spheres);
+        }
+
+
+        // Part II - Setup 3D Mesh Geometry        
+        List<Triangle> triangles = new List<Triangle>();
+
+        foreach (var obj in MeshObjects)
+        {
+            if (obj == null) continue;
+            trackedTransforms.Add(obj.transform);
+
+            var meshFilter = obj.GetComponentInChildren<MeshFilter>();
+            var renderer = obj.GetComponentInChildren<MeshRenderer>();
+            if (meshFilter == null || renderer == null) continue;
+
+            Mesh mesh = meshFilter.sharedMesh;
+            if (mesh == null) continue;
+
+            var verts = mesh.vertices;
+            var indices = mesh.triangles;
+            var localToWorld = meshFilter.transform.localToWorldMatrix;
+
+            // Extract material properties
+            var mat = renderer.sharedMaterial;
+            Color albedoColor = mat.HasProperty("_Color") ? mat.color : Color.white;
+            float metallic = mat.HasProperty("_Metallic") ? mat.GetFloat("_Metallic") : 0f;
+            float smoothness = mat.HasProperty("_Glossiness") ? mat.GetFloat("_Glossiness") : 0.5f;
+            Color emissionColor = mat.IsKeywordEnabled("_EMISSION") ? mat.GetColor("_EmissionColor") : Color.black;
+
+            Vector3 albedo = Vector3.zero;
+            Vector3 specular = Vector3.zero;
+            if (metallic > 0.5f)
+            {
+                // Glossy metallic
+                specular = new Vector3(albedoColor.r, albedoColor.g, albedoColor.b);
+            }
+            else
+            {
+                // Diffuse or glossy dielectric
+                albedo = new Vector3(albedoColor.r, albedoColor.g, albedoColor.b);
+                specular = (smoothness > 0.0f) ? new Vector3(1, 1, 1) : new Vector3(0.04f, 0.04f, 0.04f);
+            }
+
+            Vector3 emission = new Vector3(emissionColor.r, emissionColor.g, emissionColor.b);
+
+            for (int i = 0; i < indices.Length; i += 3)
+            {
+                Triangle tri = new Triangle();
+
+                tri.v0 = localToWorld.MultiplyPoint(verts[indices[i]]);
+                tri.v1 = localToWorld.MultiplyPoint(verts[indices[i + 1]]);
+                tri.v2 = localToWorld.MultiplyPoint(verts[indices[i + 2]]);
+                tri.normal = Vector3.Cross(tri.v1 - tri.v0, tri.v2 - tri.v0).normalized;
+
+                tri.albedo = albedo;
+                tri.specular = specular;
+                tri.smoothness = smoothness;
+                tri.emission = emission;
+
+                triangles.Add(tri);
+            }
+        }
+
+        // Assign triangles to compute buffer
+        if (triangleBuffer != null)
+            triangleBuffer.Release();
+
+        if (triangles.Count > 0)
+        {
+            const int stride = sizeof(float) * (3 + 3 + 3 + 3 + 3 + 3 + 1 + 3); // 88 bytes
+            triangleBuffer = new ComputeBuffer(triangles.Count, stride);
+            triangleBuffer.SetData(triangles);
         }
     }
 
@@ -205,8 +313,13 @@ public class PathTracingMaster : MonoBehaviour
         Vector3 light = DirectionalLight.transform.forward;
         PathTracingShader.SetVector("DirectionalLight", new Vector4(light.x, light.y, light.z, DirectionalLight.intensity));
 
-        if (sphereBuffer != null)
+        if (sphereBuffer != null && sphereBuffer.IsValid())
             PathTracingShader.SetBuffer(0, "SpheresBuffer", sphereBuffer);
+
+        if (triangleBuffer != null && triangleBuffer.IsValid())
+            PathTracingShader.SetBuffer(0, "TrianglesBuffer", triangleBuffer);
+
+
     }
 
     private void Render(RenderTexture destination)
