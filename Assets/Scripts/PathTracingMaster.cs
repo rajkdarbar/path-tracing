@@ -24,7 +24,7 @@ public class PathTracingMaster : MonoBehaviour
     private RenderTexture convergedRT;
 
     private uint currentSample = 0;
-    private Material addMaterial;
+    private Material accumulationMaterial;
 
     private ComputeBuffer sphereBuffer;
     private ComputeBuffer triangleBuffer;
@@ -52,7 +52,6 @@ public class PathTracingMaster : MonoBehaviour
         public float smoothness; // 4 bytes
         public Vector3 emission; // 12 bytes
     }
-
 
     private void Awake()
     {
@@ -318,8 +317,6 @@ public class PathTracingMaster : MonoBehaviour
 
         if (triangleBuffer != null && triangleBuffer.IsValid())
             PathTracingShader.SetBuffer(0, "TrianglesBuffer", triangleBuffer);
-
-
     }
 
     private void Render(RenderTexture destination)
@@ -332,19 +329,19 @@ public class PathTracingMaster : MonoBehaviour
         int threadGroupsY = Mathf.CeilToInt(Screen.height / 8.0f);
         PathTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
-        if (addMaterial == null)
-            addMaterial = new Material(Shader.Find("Hidden/AddShader"));
+        if (accumulationMaterial == null)
+            accumulationMaterial = new Material(Shader.Find("Hidden/AccumulateSamples"));
 
         RenderTexture tempRT = RenderTexture.GetTemporary(convergedRT.width, convergedRT.height, 0, RenderTextureFormat.ARGBFloat);
 
-        addMaterial.SetTexture("_MainTex", targetRT); // new sample
-        addMaterial.SetTexture("_History", convergedRT); // previous frame
-        addMaterial.SetFloat("_Sample", currentSample);
+        accumulationMaterial.SetTexture("_MainTex", targetRT); // new sample
+        accumulationMaterial.SetTexture("_History", convergedRT); // previous frame
+        accumulationMaterial.SetFloat("_Sample", currentSample);
 
-        Graphics.Blit(null, tempRT, addMaterial); // shader output gets stored in tempRT        
-        Graphics.Blit(tempRT, convergedRT); // copy back from tempRT to convergedRT
-        Graphics.Blit(convergedRT, destination);
-        RenderTexture.ReleaseTemporary(tempRT);
+        Graphics.Blit(null, tempRT, accumulationMaterial); // run accumulation shader → store result in tempRT
+        Graphics.Blit(tempRT, convergedRT); // copy accumulated result into convergedRT (persistent buffer)
+        Graphics.Blit(convergedRT, destination); // output converged image to the screen (framebuffer)
+        RenderTexture.ReleaseTemporary(tempRT); // release temporary render texture memory
 
         currentSample++;
     }

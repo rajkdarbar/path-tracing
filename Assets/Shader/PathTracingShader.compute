@@ -19,7 +19,8 @@ float seed;
 
 float rand()
 {
-    float result = frac(sin(seed / 100.0f * dot(_Pixel, float2(12.9898f, 78.233f))) * 43758.5453f); // take fraction part
+    float num = dot(_Pixel, float2(12.9898f, 78.233f));
+    float result = frac(sin(seed / 100.0f * num) * 43758.5453f); // take fraction part
     seed += 1.0f;
     return result;
 }
@@ -177,6 +178,7 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, uint sphereIndex)
 }
 
 
+// This is Möller–Trumbore ray-triangle intersection algorithm
 void IntersectTriangle(Ray ray, inout RayHit bestHit, uint triIndex)
 {
     Triangle tri = TrianglesBuffer[triIndex];
@@ -251,7 +253,6 @@ float SmoothnessToPhongAlpha(float s)
     return pow(1000.0f, s * s);
 }
 
-/*
 
 float3 SampleHemispherePhong(float3 R, float alpha)
 {
@@ -262,61 +263,7 @@ float3 SampleHemispherePhong(float3 R, float alpha)
     float cosTheta = pow(r2, 1.0f / (alpha + 1.0f));
     float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
 
-    float3 localDir = float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
-
-    // Build orthonormal basis directions around the reflection vector (i.e. building tangent space)
-    float3 helper = abs(R.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
-    float3 tangent = normalize(cross(helper, R));
-    float3 bitangent = cross(R, tangent);
-    float3x3 basis = float3x3(tangent, R, bitangent);
-
-    // Transform sampled direction from tangent space to world space
-    float3 worldDir = mul(localDir, basis);
-    worldDir = normalize(worldDir);
-    return worldDir;
-}
-
-float3 SampleHemisphereCosine(float3 normal)
-{
-    // Random numbers in [0,1]
-    float r1 = rand();
-    float r2 = rand();
-
-    // Convert (r1, r2) to spherical cosine-weighted distribution
-    float phi = 2.0f * PI * r1;
-    float r = sqrt(r2);
-
-    float x = r * cos(phi);
-    float z = r * sin(phi);
-    float y = sqrt(max(0.0f, 1.0f - r2)); // cos(theta)
-
-    float3 localDir = float3(x, y, z); // sampled direction
-
-    // Build orthonormal basis directions around the normal vector (i.e. building tangent space)
-    float3 helper = abs(normal.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
-    float3 tangent = normalize(cross(helper, normal));
-    float3 bitangent = cross(normal, tangent);
-    float3x3 basis = float3x3(tangent, normal, bitangent);
-
-    // Transform sampled direction from tangent space to world space
-    float3 worldDir = mul(localDir, basis);
-    worldDir = normalize(worldDir);
-    return worldDir;
-}
-
-*/
-
-
-float3 SampleHemispherePhong(float3 R, float alpha)
-{
-    float r1 = rand();
-    float r2 = rand();
-
-    float phi = 2.0f * PI * r1;
-    float cosTheta = pow(r2, 1.0f / (alpha + 1.0f));
-    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
-
-    float3 localDir = float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta); // sampled direction    
+    float3 localDir = float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta); // sampled direction
 
     // Build TBN matrix (surface normal is +Z axis which is pointing towards the up direction)
     float3 helper = abs(R.z) < 0.999f ? float3(0, 0, 1) : float3(1, 0, 0);
@@ -345,7 +292,7 @@ float3 SampleHemisphereCosine(float3 N)
     float y = r * sin(phi);
     float z = sqrt(max(0.0f, 1.0f - r2)); // cos(theta)
 
-    float3 localDir = float3(x, y, z); // sampled direction    
+    float3 localDir = float3(x, y, z); // sampled direction
 
     // Build TBN matrix (surface normal is +Z axis which is pointing towards the up direction)
     float3 helper = abs(N.z) < 0.999f ? float3(0, 0, 1) : float3(1, 0, 0);
@@ -358,7 +305,6 @@ float3 SampleHemisphereCosine(float3 N)
     worldDir = normalize(worldDir);
     return worldDir;
 }
-
 
 
 float approx(float a, float b, float eps = 0.001f)
@@ -451,17 +397,17 @@ float3 Shade(inout Ray ray, RayHit hit)
         float specChance = energy(hit.specular);
         float sum = diffChance + specChance;
 
-        diffChance /= sum;
-        specChance /= sum;
+        // Note that, (diffProbability + specProbability) = 1
+        float diffProbability = (diffChance / sum);
+        float specProbability = (specChance / sum);
 
         float r = rand();
 
-        if (r < specChance)
+        if (r < specProbability)
         {
             // SPECULAR branch
             float3 R = reflect(ray.direction, hit.normal);
             float alpha = SmoothnessToPhongAlpha(hit.smoothness);
-
             float3 wo = SampleHemispherePhong(R, alpha);
 
             // cos(theta_i) = incoming angle
@@ -473,7 +419,7 @@ float3 Shade(inout Ray ray, RayHit hit)
             // Update the outgoing ray
             ray.direction = wo;
             ray.origin = hit.position + wo * 0.005f;
-            ray.energy *= (hit.specular * (weight / specChance)); // division by 'specChance' makes Russian Roulette based selection unbaised
+            ray.energy *= (hit.specular * (weight / specProbability)); // division by 'specProbability' makes Russian Roulette based selection unbaised
             return 0;
         }
 
@@ -482,7 +428,7 @@ float3 Shade(inout Ray ray, RayHit hit)
 
         ray.direction = wo;
         ray.origin = hit.position + wo * 0.005f;
-        ray.energy *= (hit.albedo / diffChance); // division by 'diffChance' makes Russian Roulette based selection unbaised
+        ray.energy *= (hit.albedo / diffProbability); // division by 'diffProbability' makes Russian Roulette based selection unbaised
         return 0;
     }
 

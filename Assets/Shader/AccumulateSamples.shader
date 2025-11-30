@@ -1,6 +1,4 @@
-
-
-Shader "Hidden/AddShader"
+Shader "Hidden/AccumulateSamples"
 {
     Properties
     {
@@ -11,9 +9,9 @@ Shader "Hidden/AddShader"
 
     SubShader
     {
-        Cull Off 
-		ZWrite Off 
-		ZTest Always
+        Cull Off
+        ZWrite Off
+        ZTest Always
 
         Pass
         {
@@ -46,20 +44,22 @@ Shader "Hidden/AddShader"
             sampler2D _History;
             float _Sample; // current sample index (0, 1, 2, ...)
 
+
             float4 frag(v2f i) : SV_Target
             {
-                float3 newSample = tex2D(_MainTex, i.uv).rgb;
-                float3 oldAccum = tex2D(_History, i.uv).rgb;
+                float3 currentSample = tex2D(_MainTex, i.uv).rgb; // new sample from current frame
+                float3 accumulatedColor = tex2D(_History, i.uv).rgb; // accumulated color from previous frames
 
-                // Compute weight
-                float weightNew = 1.0 / (_Sample + 1.0);
-                float weightOld = _Sample / (_Sample + 1.0);
+                // Compute blending weights
+                float weightCurrent = 1.0 / (_Sample + 1.0); // smaller weight for new sample
+                float weightAccum = _Sample / (_Sample + 1.0); // larger weight for accumulated history
 
-                // Explicit averaging.
-                float3 result = oldAccum * weightOld + newSample * weightNew;
+                // Progressive running average
+                float3 result = (accumulatedColor * weightAccum) + (currentSample * weightCurrent);
 
                 return float4(result, 1);
             }
+
             ENDCG
         }
     }
