@@ -83,6 +83,12 @@ Ray CreateCameraRay(float2 uv)
     float2 p = uv; // uv ∈ [ - 1, 1] normalized device coordinates
     float r = length(p); // distance from image center
 
+    // k = 1.0 → standard fisheye (no extra distortion)
+    // k < 1.0 → barrel distortion (rays bend outward → stretched edges)
+    // k > 1.0 → pincushion distortion (rays bend inward → squeezed edges)
+    float k = 1.0f;  
+
+
     // Ignore pixels outside the fisheye circle
     if (r > 1.0f)
     {
@@ -94,8 +100,8 @@ Ray CreateCameraRay(float2 uv)
     }
 
     // Map pixel position to spherical coordinates
-    float phi = atan2(p.y, p.x); // azimuthal angle (horizontal sweep)
-    float theta = r * (PI / 2.0f); // polar angle, 180° field of view
+    float phi = atan2(p.y, p.x); // azimuthal angle (horizontal sweep); rotation along Y in Unity 
+    float theta = pow(r, k) * (PI / 2.0f); // polar angle, 180° field of view; rotation along - Z in Unity
 
     // Convert spherical → Cartesian in camera (view) space
     float3 dir;

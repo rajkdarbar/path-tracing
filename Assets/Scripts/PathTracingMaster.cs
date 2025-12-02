@@ -19,6 +19,7 @@ public class PathTracingMaster : MonoBehaviour
 
     private Camera mainCamera;
     private float lastFieldOfView;
+    private float lastOrthographicSize;
 
     private RenderTexture targetRT;
     private RenderTexture convergedRT;
@@ -95,6 +96,12 @@ public class PathTracingMaster : MonoBehaviour
         {
             currentSample = 0;
             lastFieldOfView = mainCamera.fieldOfView;
+        }
+
+        if (mainCamera.orthographicSize != lastOrthographicSize)
+        {
+            currentSample = 0;
+            lastOrthographicSize = mainCamera.orthographicSize;
         }
 
         bool needsRebuild = false;

@@ -82,21 +82,27 @@ Ray CreateCameraRay(float2 uv, float isOrthographicMode)
     if (isOrthographicMode == 1.0f)
     {
         float aspect = (Width / Height);
-
-        // Map UV to view-space positions on the image plane
-        float3 originViewSpace = float3(uv.x * aspect * OrthoSize, uv.y * OrthoSize, 0);
-
-        // Transform origin to world space
+        float3 originViewSpace = float3(uv.x * aspect * OrthoSize, uv.y * OrthoSize, 0); // map UV to view - space positions on the image plane
         float3 origin = mul(CameraToWorld, float4(originViewSpace, 1)).xyz;
-
-        // All rays have the same forward direction (-Z in view space)
-        float3 direction = normalize(mul((float3x3)CameraToWorld, float3(0, 0, - 1)));
+        float3 direction = normalize(mul((float3x3)CameraToWorld, float3(0, 0, - 1))); // all rays have the same forward direction (- Z in view space)
 
         return CreateRay(origin, direction);
     }
-    
+
     else
     {
+
+        /*
+
+        // Simple perspective camera
+        float3 origin = mul(CameraToWorld, float4(0, 0, 0, 1)).xyz;
+        float3 dirView = normalize(float3(uv.x, uv.y, - 1)); // ray through pixel on image plane
+        float3 direction = normalize(mul((float3x3)CameraToWorld, dirView));
+        return CreateRay(origin, direction);
+
+        */
+
+
         // Camera origin in world space
         float3 origin = mul(CameraToWorld, float4(0, 0, 0, 1)).xyz;
 
@@ -112,6 +118,8 @@ Ray CreateCameraRay(float2 uv, float isOrthographicMode)
         return CreateRay(origin, direction);
     }
 }
+
+
 
 struct RayHit
 {

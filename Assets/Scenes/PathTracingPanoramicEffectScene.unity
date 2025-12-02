@@ -209,13 +209,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 705507993}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
+  m_LocalRotation: {x: 0.9390943, y: 0, z: 0, w: 0.34365973}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+  m_LocalEulerAnglesHint: {x: 139.8, y: 0, z: 0}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0
@@ -275,8 +275,8 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 500
-  field of view: 70
+  far clip plane: 1000
+  field of view: 63
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -302,13 +302,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.17729689, y: 0.55998033, z: 0.1241446, w: 0.7997349}
-  m_LocalPosition: {x: -135, y: 50, z: 11}
+  m_LocalRotation: {x: -0, y: -0.9988062, z: 0, w: -0.048849784}
+  m_LocalPosition: {x: -108, y: 36, z: 354}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: -25, y: 70, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -185.6, z: 0}
 --- !u!114 &963194229
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -471,7 +471,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: -2, z: 0}
-  m_LocalScale: {x: 0.8, y: 0.8, z: 0.8}
+  m_LocalScale: {x: 0.4, y: 0.4, z: 0.4}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1075451731}
@@ -496,7 +496,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 0b13c1fcccee6a04f83cbf61ff38a3b6, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 90.4
+      value: 2845
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 0b13c1fcccee6a04f83cbf61ff38a3b6, type: 3}
       propertyPath: m_LocalPosition.y
@@ -504,7 +504,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 0b13c1fcccee6a04f83cbf61ff38a3b6, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -106.3
+      value: -141
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 0b13c1fcccee6a04f83cbf61ff38a3b6, type: 3}
       propertyPath: m_LocalRotation.w
@@ -537,7 +537,7 @@ PrefabInstance:
     - target: {fileID: -7635826562936255635, guid: 0b13c1fcccee6a04f83cbf61ff38a3b6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 6b5e509a1f7475540a2be9dee401bc82, type: 2}
+      objectReference: {fileID: 2100000, guid: 708f4dfdf02489f4eafbf323be918aa0, type: 2}
     - target: {fileID: 919132149155446097, guid: 0b13c1fcccee6a04f83cbf61ff38a3b6, type: 3}
       propertyPath: m_Name
       value: teapot
