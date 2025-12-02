@@ -305,9 +305,13 @@ public class PathTracingMaster : MonoBehaviour
     {
         PathTracingShader.SetFloat("seed", Random.value);
         PathTracingShader.SetTexture(0, "SkyboxTexture", SkyboxTexture);
+
         PathTracingShader.SetMatrix("CameraToWorld", mainCamera.cameraToWorldMatrix);
         PathTracingShader.SetMatrix("CameraInverseProjection", mainCamera.projectionMatrix.inverse);
         PathTracingShader.SetVector("PixelOffset", new Vector2(Random.value, Random.value));
+
+        PathTracingShader.SetFloat("Width", Screen.width);
+        PathTracingShader.SetFloat("Height", Screen.height);
 
         Vector3 light = DirectionalLight.transform.forward;
         PathTracingShader.SetVector("DirectionalLight", new Vector4(light.x, light.y, light.z, DirectionalLight.intensity));
@@ -317,7 +321,20 @@ public class PathTracingMaster : MonoBehaviour
 
         if (triangleBuffer != null && triangleBuffer.IsValid())
             PathTracingShader.SetBuffer(0, "TrianglesBuffer", triangleBuffer);
+
+        // For orthographic projection mode
+        if (mainCamera.orthographic)
+        {
+            PathTracingShader.SetFloat("OrthoSize", mainCamera.orthographicSize);
+            PathTracingShader.SetFloat("OrthographicMode", 1.0f);
+        }
+        else
+        {
+            PathTracingShader.SetFloat("OrthoSize", 100.0f); // default value   
+            PathTracingShader.SetFloat("OrthographicMode", 0.0f); // default            
+        }
     }
+
 
     private void Render(RenderTexture destination)
     {

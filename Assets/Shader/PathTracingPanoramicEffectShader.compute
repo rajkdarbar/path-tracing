@@ -76,42 +76,28 @@ Ray CreateRay(float3 origin, float3 direction)
     return ray;
 }
 
-
-Ray CreateCameraRay(float2 uv, float isOrthographicMode)
+// Create primary ray for equirectangular (360° panoramic) projection
+Ray CreateCameraRay(float2 uv)
 {
-    if (isOrthographicMode == 1.0f)
-    {
-        float aspect = (Width / Height);
+    float2 p = uv; // uv ∈ [ - 1, 1] normalized device coordinates
 
-        // Map UV to view-space positions on the image plane
-        float3 originViewSpace = float3(uv.x * aspect * OrthoSize, uv.y * OrthoSize, 0);
+    // Map pixel position to spherical coordinates
+    float phi = p.x * PI; // azimuthal angle : horizontal sweep [ - π, + π]
+    float theta = (p.y * 0.5f + 0.5f) * PI; // polar angle : vertical sweep [0, π]
 
-        // Transform origin to world space
-        float3 origin = mul(CameraToWorld, float4(originViewSpace, 1)).xyz;
+    // Convert spherical → Cartesian in camera (view) space
+    float3 dir;
+    dir.x = sin(theta) * cos(phi);
+    dir.y = - cos(theta);
+    dir.z = sin(theta) * sin(phi);
 
-        // All rays have the same forward direction (-Z in view space)
-        float3 direction = normalize(mul((float3x3)CameraToWorld, float3(0, 0, - 1)));
+    // Transform direction from camera space → world space
+    float3 origin = mul(CameraToWorld, float4(0, 0, 0, 1)).xyz;
+    float3 worldDir = normalize(mul((float3x3)CameraToWorld, dir));
 
-        return CreateRay(origin, direction);
-    }
-    
-    else
-    {
-        // Camera origin in world space
-        float3 origin = mul(CameraToWorld, float4(0, 0, 0, 1)).xyz;
-
-        // Unproject from NDC → view space
-        float4 pos = mul(CameraInverseProjection, float4(uv, 1.0f, 1.0f));
-        pos /= pos.w; // perspective divide
-        float3 viewDir = normalize(pos.xyz); // direction in view space
-
-        // Convert to world space
-        float3 direction = mul(CameraToWorld, float4(viewDir, 0)).xyz;
-        direction = normalize(direction);
-
-        return CreateRay(origin, direction);
-    }
+    return CreateRay(origin, worldDir);
 }
+
 
 struct RayHit
 {
@@ -277,6 +263,7 @@ float SmoothnessToPhongAlpha(float s)
     return pow(1000.0f, s * s);
 }
 
+
 float3 SampleHemispherePhong(float3 R, float alpha)
 {
     float r1 = rand();
@@ -343,10 +330,9 @@ bool approx3(float3 a, float3 b, float eps = 0.001f)
 float3 Shade(inout Ray ray, RayHit hit)
 {
     // Case I: SKY (miss case)
-    if (hit.distance == 1.#INF || hit.distance > 1e5)
+    if (hit.distance == 1.#INF)
     {
         ray.energy = 0.0f;
-
         float theta = acos(ray.direction.y) / - PI;
         float phi = atan2(ray.direction.x, - ray.direction.z) / - PI * 0.5f;
         float3 sky = SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
@@ -466,11 +452,15 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 {
     pixel = id.xy;
 
+    // Get the dimensions of the RenderTexture
+    uint width, height;
+    Result.GetDimensions(width, height);
+
     // Convert pixel coordinates to normalized device coordinates [-1, 1]
-    float2 uv = ((id.xy + PixelOffset) / float2(Width, Height)) * 2.0f - 1.0f;
+    float2 uv = ((id.xy + PixelOffset) / float2(width, height)) * 2.0f - 1.0f;
 
     // Generate a primary ray from the camera through this pixel
-    Ray ray = CreateCameraRay(uv, OrthographicMode);
+    Ray ray = CreateCameraRay(uv);
 
     float3 shadedColor = float3(0, 0, 0);
 

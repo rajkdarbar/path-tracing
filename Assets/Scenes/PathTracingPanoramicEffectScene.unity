@@ -275,10 +275,10 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1000
+  far clip plane: 500
   field of view: 70
   orthographic: 0
-  orthographic size: 200
+  orthographic size: 5
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -302,13 +302,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -133, y: 94.01, z: -210}
+  m_LocalRotation: {x: -0.17729689, y: 0.55998033, z: 0.1241446, w: 0.7997349}
+  m_LocalPosition: {x: -135, y: 50, z: 11}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -25, y: 70, z: 0}
 --- !u!114 &963194229
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -321,13 +321,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be7005bc49efb414da3a85f2bfbaa243, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  PathTracingShader: {fileID: 7200000, guid: bade1de0d3c9dd149b816f38b6f87275, type: 3}
-  SkyboxTexture: {fileID: 2800000, guid: c98a8228dc3e4274e8e19f0ccd34854c, type: 3}
+  PathTracingShader: {fileID: 7200000, guid: 2a310850eef6fb3488b53463f2131a98, type: 3}
+  SkyboxTexture: {fileID: 2800000, guid: 941c159d55e667a4292d15e1eee1390a, type: 3}
   DirectionalLight: {fileID: 705507994}
   RegenerateScene: 0
   SphereRadius: {x: 3, y: 20}
   SpheresMax: 50
-  SpherePlacementRadius: 500
+  SpherePlacementRadius: 300
   MeshObjects:
   - {fileID: 1069045747}
 --- !u!1 &1069045747 stripped
@@ -470,7 +470,7 @@ Transform:
   m_GameObject: {fileID: 1195608177}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 51, y: -2, z: 0}
+  m_LocalPosition: {x: 0, y: -2, z: 0}
   m_LocalScale: {x: 0.8, y: 0.8, z: 0.8}
   m_ConstrainProportionsScale: 0
   m_Children:
