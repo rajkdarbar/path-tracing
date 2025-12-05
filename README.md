@@ -23,55 +23,50 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 
 ---
 
-## 🖼️ Sample Path Traced Output Images
+## 🖼️ Path Traced Sample Output Images
 
 ### 💠 Material-Based Scenes
 
-<table align="center">
-<tr>
-<td align="center" width="50%">
-  <img src="Assets/Resources/Output Images/pathtracing-diffuse-scene.png" width="290"><br>
-  🔵 Diffuse Scene
-</td>
-<td align="center" width="50%">
-  <img src="Assets/Resources/Output Images/pathtracing-glossy-dielectric-scene.png" width="290"><br>
-  🟣 Glossy Dielectric Scene
-</td>
-</tr>
-<tr>
-<td align="center" width="50%">
-  <img src="Assets/Resources/Output Images/pathtracing-glossy-metallic-scene.png" width="290"><br>
-  🟡 Glossy Metallic Scene
-</td>
-<td align="center" width="50%">
-  <img src="Assets/Resources/Output Images/pathtracing-mixed-scene.png" width="290"><br>
-  🟠 Mixed Scene — Diffuse, Dielectric, & Metallic
-</td>
-</tr>
-</table>
+<div align="left">
+  <img src="Assets/Resources/Output Images/pathtracing-diffuse-scene.png" width="290">
+  <img src="Assets/Resources/Output Images/pathtracing-glossy-dielectric-scene.png" width="290">
+</div>
 
----
+<div align="left">
+  <img src="Assets/Resources/Output Images/pathtracing-glossy-metallic-scene.png" width="290">
+  <img src="Assets/Resources/Output Images/pathtracing-mixed-scene.png" width="290">
+</div>
 
-### 📷 Camera Projection & Lens Effects
+**🟦 Top-Left:** Diffuse Scene  
+**🟪 Top-Right:** Glossy Dielectric Scene  
+**🟨 Bottom-Left:** Glossy Metallic Scene  
+**🟧 Bottom-Right:** Mixed Scene — Diffuse, Dielectric, & Metallic  
 
-<table align="center">
-<tr>
-<td align="center" width="50%">
-  <img src="Assets/Resources/Output Images/pathtracing-orthographic-view.png" width="290"><br>
-  🟢 Orthographic Camera Projection
-</td>
-<td align="center" width="50%">
-  <img src="Assets/Resources/Output Images/pathtracing-fisheye-effect.png" width="290"><br>
-  🔴 Fisheye Lens Effect
-</td>
-</tr>
-<tr>
-<td colspan="2" align="center">
-  <img src="Assets/Resources/Output Images/pathtracing-panoramic-effect.png" width="600"><br>
-  🟤 Panoramic Lens Effect
-</td>
-</tr>
-</table>
+<br>
+
+### 📷 Scenes Rendered with Different Camera Projections & Lens Effects
+
+<div align="left">
+  <img src="Assets/Resources/Output Images/pathtracing-orthographic-view.png" width="290">
+  <img src="Assets/Resources/Output Images/pathtracing-fisheye-effect.png" width="293">
+</div>
+
+<div align="left">
+  <img src="Assets/Resources/Output Images/pathtracing-panoramic-effect.png" width="588">
+</div>
+
+**🟩 Top-Left:** Orthographic Camera Projection  
+**🟥 Top-Right:** Fisheye Lens Effect  
+**🟫 Bottom:** Panoramic Lens Effect
+
+
+
+
+
+
+
+
+
 
 
 
