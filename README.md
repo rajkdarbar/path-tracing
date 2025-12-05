@@ -67,6 +67,16 @@ Don't forget to take a look at [this video](https://youtu.be/tOEfEWq_kg4) runnin
 
 ---
 
+## ⚠️ Limitations & Future Improvements
+
+- The current implementation works best with **low-poly meshes** (a few hundred triangles). High-poly models slow down rendering due to per-triangle intersection checks and could be significantly improved with **Bounding Volume Hierarchy (BVH)** acceleration.
+
+- This implementation is **not real-time** — each frame takes several minutes to converge. **Denoising** could be used for possible enhancement.
+
+- It lacks **Multiple Importance Sampling (MIS)** for more accurate global illumination.
+
+---
+
 ## 🙏 Credits
 
 Special thanks to [**David Kuri**](https://twitter.com/davidjkuri) for his outstanding GPU Path Tracing tutorial series, which served as the main inspiration for this project. 
