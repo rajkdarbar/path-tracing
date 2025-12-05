@@ -63,7 +63,7 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 
 ## 🎥 Demo Video
 
-Don't forget to take a look at [this video](https://youtu.be/tOEfEWq_kg4) running on an **NVIDIA GeForce RTX 3070 Laptop GPU**.
+Don't forget to take a look at [this video](https://youtu.be/wOaUeJfeyXY) running on an **NVIDIA GeForce RTX 3070 Laptop GPU**.
 
 ---
 
