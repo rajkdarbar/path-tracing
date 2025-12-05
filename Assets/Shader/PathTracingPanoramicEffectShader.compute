@@ -446,18 +446,13 @@ float3 Shade(inout Ray ray, RayHit hit)
 }
 
 
-
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     pixel = id.xy;
 
-    // Get the dimensions of the RenderTexture
-    uint width, height;
-    Result.GetDimensions(width, height);
-
     // Convert pixel coordinates to normalized device coordinates [-1, 1]
-    float2 uv = ((id.xy + PixelOffset) / float2(width, height)) * 2.0f - 1.0f;
+    float2 uv = ((id.xy + PixelOffset) / float2(Width, Height)) * 2.0f - 1.0f;
 
     // Generate a primary ray from the camera through this pixel
     Ray ray = CreateCameraRay(uv);
@@ -474,8 +469,15 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 reflectedRadiance = Shade(ray, hit); // light reflected / emitted from the surface toward the camera
         shadedColor += incidentRayEnergy * reflectedRadiance; // accumulate final pixel color
 
-        if (! any(ray.energy)) // stop when the ray no longer carries light
-        break;
+
+        // Russian Roulette: probabilistic early path termination
+        float p = max(ray.energy.r, max(ray.energy.g, ray.energy.b));
+        p = clamp(p, 0.05f, 0.99f); // keep survival probability within [5 %, 99 % ]
+
+        if (rand() > p)
+        break; // terminate the path randomly
+
+        ray.energy /= p; // scale energy to keep the estimator unbiased
     }
 
     // Store final pixel color
