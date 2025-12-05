@@ -59,7 +59,22 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 **🟥 Top-Right:** Fisheye Lens Effect  
 **🟫 Bottom:** Panoramic Lens Effect
 
+---
 
+## 🎥 Demo Video
+
+Don't forget to take a look at [this video](https://youtu.be/tOEfEWq_kg4) running on an **NVIDIA GeForce RTX 3070 Laptop GPU**.
+
+---
+
+## 🙏 Credits
+
+Special thanks to [**David Kuri**](https://twitter.com/davidjkuri) for his outstanding GPU Path Tracing tutorial series, which served as the main inspiration for this project. 
+
+- 📙 [Tutorial – GPU Path Tracing in Unity (Part 2)](https://web.archive.org/web/20230926231248/http://three-eyed-games.com/2018/05/12/gpu-path-tracing-in-unity-part-2/)  
+- 🖥️ [Code – Unity Path Tracing Tutorial (Part 2)](https://bitbucket.org/Daerst/gpu-ray-tracing-in-unity/src/Tutorial_Pt2/)  
+- 📙 [Tutorial – GPU Path Tracing in Unity (Part 3)](https://web.archive.org/web/20230926225937/http://three-eyed-games.com/2019/03/18/gpu-path-tracing-in-unity-part-3/)  
+- 🖥️ [Code – Unity Path Tracing Tutorial (Part 3)](https://bitbucket.org/Daerst/gpu-ray-tracing-in-unity/src/Tutorial_Pt3/)
 
 
 
