@@ -23,3 +23,41 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 
 ---
 
+## 🖼️ Sample Path Traced Output Images
+
+### 🟦 Diffuse Scene
+<img src="Assets/Resources/Output%20Images/raytracing-diffuse-spheres.png" width="600">
+
+<br>
+
+### 🟪 Glossy Dielectric Scene
+<img src="Assets/Resources/Output%20Images/raytracing-glossy-metal-spheres.png" width="600">
+
+<br>
+
+### 🟨 Glossy Metallic Scene
+<img src="Assets/Resources/Output%20Images/raytracing-glossy-metal-spheres.png" width="600">
+
+<br>
+
+### 🟧 Mixed Scene — Diffuse, Dielectric, & Metallic
+<img src="Assets/Resources/Output%20Images/raytracing-mixed-spheres.png" width="600">
+
+<br>
+
+### 🟩 Rendered Scene with Orthographic Camera Projection
+<img src="Assets/Resources/Output%20Images/raytracing-mixed-spheres.png" width="600">
+
+<br>
+
+### 🟥 Rendered Scene with Fisheye Lens Effect
+<img src="Assets/Resources/Output%20Images/raytracing-mixed-spheres.png" width="600">
+
+<br>
+
+### 🟫 Rendered Scene with Panoramic Lens Effect
+<img src="Assets/Resources/Output%20Images/raytracing-mixed-spheres.png" width="600">
+
+<br>
+
+
