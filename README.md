@@ -7,19 +7,19 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 
 ## 🧩 What This Project Demonstrates
 
-✅ **Fully GPU-accelerated path tracer** implemented with Unity compute shaders  
-✅ Renders **procedural spheres**, a **ground plane**, and **low-poly mesh geometry**  
-✅ Uses **unbiased Monte Carlo integration** with **importance sampling** for efficient light transport  
-✅ Implements **Material-specific sampling:**  
+- **Fully GPU-accelerated path tracer** implemented with Unity compute shaders  
+- Renders **procedural spheres**, a **ground plane**, and **low-poly mesh geometry**  
+- Uses **unbiased Monte Carlo integration** with **importance sampling** for efficient light transport  
+- Implements **Material-specific sampling:**  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Diffuse → cosine-weighted hemisphere sampling  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Glossy metallic → Phong-lobe specular sampling  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Glossy dielectric → probabilistic mix of diffuse / specular (Russian Roulette)  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Emissive surfaces → direct light sources  
-✅ **Russian Roulette path termination** for unbiased, efficient multi-bounce tracing  
-✅ **Per-pixel randomness** (pixel jitter + random seed) for decorrelated sampling across frames  
-✅ **Progressive sample accumulation** via a custom blending shader for noise reduction  
-✅ Produces realistic effects such as **indirect lighting**, **soft reflections**, **soft shadows**, and **environment-based illumination**  
-✅ Supports multiple **camera models** — Perspective, Orthographic, Fisheye, and Panoramic  
+- **Russian Roulette path termination** for unbiased, efficient multi-bounce tracing  
+- **Per-pixel randomness** (pixel jitter + random seed) for decorrelated sampling across frames  
+- **Progressive sample accumulation** via a custom blending shader for noise reduction  
+- Produces realistic effects such as **indirect lighting**, **soft reflections**, **soft shadows**, and **environment-based illumination**  
+- Supports multiple **camera models** — Perspective, Orthographic, Fisheye, and Panoramic  
 
 ---
 
@@ -37,10 +37,10 @@ It focuses on the core ideas of **physically-based light transport** — tracing
   <img src="Assets/Resources/Output Images/pathtracing-mixed-scene.png" width="290">
 </div>
 
-**🟦 Top-Left:** Diffuse Scene  
-**🟪 Top-Right:** Glossy Dielectric Scene  
-**🟨 Bottom-Left:** Glossy Metallic Scene  
-**🟧 Bottom-Right:** Mixed Scene — Diffuse, Dielectric, & Metallic  
+**Top-Left:** Diffuse Scene  
+**Top-Right:** Glossy Dielectric Scene  
+**Bottom-Left:** Glossy Metallic Scene  
+**Bottom-Right:** Mixed Scene — Diffuse, Dielectric, & Metallic  
 
 <br>
 
@@ -55,9 +55,9 @@ It focuses on the core ideas of **physically-based light transport** — tracing
   <img src="Assets/Resources/Output Images/pathtracing-panoramic-effect.png" width="588">
 </div>
 
-**🟩 Top-Left:** Orthographic Camera Projection  
-**🟥 Top-Right:** Fisheye Lens Effect  
-**🟫 Bottom:** Panoramic Lens Effect
+**Top-Left:** Orthographic Camera Projection  
+**Top-Right:** Fisheye Lens Effect  
+**Bottom:** Panoramic Lens Effect
 
 ---
 
