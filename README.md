@@ -1,7 +1,6 @@
 # 🔆 Simple GPU Path Tracer
 
-The goal of this mini project is to understand the fundamentals of **path tracing** using Unity’s compute shaders.  
-It focuses on the core ideas of **physically-based light transport** — tracing rays, simulating surface interactions, and progressively converging toward realistic illumination — all without relying on Unity’s built-in rendering pipeline.
+The goal of this mini project is to understand the fundamentals of **path tracing** using Unity’s compute shaders. It focuses on the core ideas of **physically-based light transport** — tracing rays, simulating surface interactions, and progressively converging toward realistic illumination — all without relying on Unity’s built-in rendering pipeline.
 
 ---
 
