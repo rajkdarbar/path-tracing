@@ -11,10 +11,10 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 - Renders **procedural spheres**, a **ground plane**, and **low-poly mesh geometry**  
 - Uses **unbiased Monte Carlo integration** with **importance sampling** for efficient light transport  
 - Implements **Material-specific sampling:**  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Diffuse → cosine-weighted hemisphere sampling  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Glossy metallic → Phong-lobe specular sampling  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Glossy dielectric → probabilistic mix of diffuse / specular (Russian Roulette)  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Emissive surfaces → direct light sources  
+&nbsp;&nbsp;&nbsp;• Diffuse → cosine-weighted hemisphere sampling  
+&nbsp;&nbsp;&nbsp;• Glossy metallic → Phong-lobe specular sampling  
+&nbsp;&nbsp;&nbsp;• Glossy dielectric → probabilistic mix of diffuse / specular (Russian Roulette)  
+&nbsp;&nbsp;&nbsp;• Emissive surfaces → direct light sources  
 - **Russian Roulette path termination** for unbiased, efficient multi-bounce tracing  
 - **Per-pixel randomness** (pixel jitter + random seed) for decorrelated sampling across frames  
 - **Progressive sample accumulation** via a custom blending shader for noise reduction  
