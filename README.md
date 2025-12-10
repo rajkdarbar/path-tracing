@@ -42,8 +42,6 @@ It focuses on the core ideas of **physically-based light transport** — tracing
 **Bottom-Left:** Glossy Metallic Scene  
 **Bottom-Right:** Mixed Scene — Diffuse, Dielectric, & Metallic  
 
-<br>
-
 ### 📷 Scenes Rendered with Different Camera Projections & Lens Effects
 
 <div align="left">
